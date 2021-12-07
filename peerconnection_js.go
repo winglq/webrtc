@@ -517,6 +517,47 @@ func iceServersToValue(iceServers []ICEServer) js.Value {
 }
 
 func iceServerToValue(server ICEServer) js.Value {
+	isTurn := func() bool {
+		for _, url := range server.URLs {
+			u, err := ice.ParseURL(url)
+			if err != nil {
+				panic(err)
+			}
+			if u.Scheme == ice.SchemeTypeTURN || u.Scheme == ice.SchemeTypeTURNS {
+				return true
+			}
+		}
+		return false
+	}
+
+	isStun := func() bool {
+		for _, url := range server.URLs {
+			u, err := ice.ParseURL(url)
+			if err != nil {
+				panic(err)
+			}
+			if u.Scheme == ice.SchemeTypeSTUN || u.Scheme == ice.SchemeTypeSTUNS {
+				return true
+			}
+		}
+		return false
+	}
+
+	if isTurn() && isStun() {
+		panic("mix turn and stun is not supported")
+	}
+
+	if isTurn() {
+		if server.CredentialType == ICECredentialTypeOauth {
+			panic("oauth credential for turn is not supported")
+		}
+		return js.ValueOf(map[string]interface{}{
+			"urls":       stringsToValue(server.URLs), // required
+			"username":   stringToValueOrUndefined(server.Username),
+			"credential": stringToValueOrUndefined(server.Credential.(string)),
+			// "credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
+		})
+	}
 	return js.ValueOf(map[string]interface{}{
 		"urls":     stringsToValue(server.URLs), // required
 		"username": stringToValueOrUndefined(server.Username),
